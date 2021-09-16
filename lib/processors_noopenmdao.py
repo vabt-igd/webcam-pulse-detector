@@ -116,7 +116,7 @@ class WebcamFaceTrackingPulseCalculator(object):
         # first we have to calculate fps
         # if it's not ready - skip everything else
         if not self.calculate_fps():
-            cv2.putText(self.frame_out, "Calculating FPS", (10, 450), cv2.FONT_HERSHEY_PLAIN, 1, red_color, 2)
+            cv2.putText(self.frame_out, "Calculating FPS", (10, 700), cv2.FONT_HERSHEY_PLAIN, 1, red_color, 2)
             return
 
         # try to detect face
