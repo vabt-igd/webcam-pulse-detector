@@ -1,18 +1,19 @@
-from lib.device import Camera
-from lib.processors_noopenmdao import findFaceGetPulse
-from lib.interface import plotXY, imshow, waitKey, destroyWindow
-from cv2 import moveWindow
 import argparse
-import numpy as np
 import datetime
-#TODO: work on serial port comms, if anyone asks for it
-#from serial import Serial
 import socket
 import sys
 
+import numpy as np
+from cv2 import moveWindow
+# TODO: work on serial port comms, if anyone asks for it
+from serial import Serial
 
-class getPulseApp(object):
+from lib.device import Camera
+from lib.interface import plot_x_y, ocv_imshow, ocv_wait_key, ocv_destroy_window
+from lib.processors_noopenmdao import WebcamFaceTrackingPulseCalculator
 
+
+class WebcamPulseApp(object):
     """
     Python application that finds a face in a webcam stream, then isolates the
     forehead.
@@ -46,8 +47,8 @@ class getPulseApp(object):
                 ip, port = udp.split(":")
                 port = int(port)
             self.udp = (ip, port)
-            self.sock = socket.socket(socket.AF_INET, # Internet
-                 socket.SOCK_DGRAM) # UDP
+            self.sock = socket.socket(socket.AF_INET,  # Internet
+                                      socket.SOCK_DGRAM)  # UDP
 
         self.cameras = []
         self.selected_cam = 0
@@ -68,14 +69,14 @@ class getPulseApp(object):
 
         # Basically, everything that isn't communication
         # to the camera device or part of the GUI
-        self.processor = findFaceGetPulse()
+        self.processor = WebcamFaceTrackingPulseCalculator()
 
         # Init parameters for the cardiac data plot
         self.bpm_plot = False
         self.plot_title = "Data display - raw signal (top) and PSD (bottom)"
 
         # Maps keystrokes to specified methods
-        #(A GUI window must have focus for these to work)
+        # (A GUI window must have focus for these to work)
         self.key_controls = {"s": self.toggle_search,
                              "d": self.toggle_display_plot,
                              "c": self.toggle_cam,
@@ -85,7 +86,7 @@ class getPulseApp(object):
         if len(self.cameras) > 1:
             self.processor.find_faces = True
             self.bpm_plot = False
-            destroyWindow(self.plot_title)
+            ocv_destroy_window(self.plot_title)
             self.selected_cam += 1
             self.selected_cam = self.selected_cam % len(self.cameras)
 
@@ -106,7 +107,7 @@ class getPulseApp(object):
         Locking the forehead location in place significantly improves
         data quality, once a forehead has been sucessfully isolated.
         """
-        #state = self.processor.find_faces.toggle()
+        # state = self.processor.find_faces.toggle()
         state = self.processor.find_faces_toggle()
         print("face detection lock =", not state)
 
@@ -117,7 +118,7 @@ class getPulseApp(object):
         if self.bpm_plot:
             print("bpm plot disabled")
             self.bpm_plot = False
-            destroyWindow(self.plot_title)
+            ocv_destroy_window(self.plot_title)
         else:
             print("bpm plot enabled")
             if self.processor.find_faces:
@@ -130,17 +131,17 @@ class getPulseApp(object):
         """
         Creates and/or updates the data display
         """
-        plotXY([[self.processor.times,
-                 self.processor.samples],
-                [self.processor.freqs,
+        plot_x_y([[self.processor.times,
+                   self.processor.samples],
+                  [self.processor.freqs,
                  self.processor.fft]],
-               labels=[False, True],
-               showmax=[False, "bpm"],
-               label_ndigits=[0, 0],
-               showmax_digits=[0, 1],
-               skip=[3, 3],
-               name=self.plot_title,
-               bg=self.processor.slices[0])
+                 labels=[False, True],
+                 showmax=[False, "bpm"],
+                 label_ndigits=[0, 0],
+                 showmax_digits=[0, 1],
+                 skip=[3, 3],
+                 name=self.plot_title,
+                 bg=self.processor.slices[0])
 
     def key_handler(self):
         """
@@ -150,7 +151,7 @@ class getPulseApp(object):
         detected.
         """
 
-        self.pressed = waitKey(10) & 255  # wait for keypress for 10 ms
+        self.pressed = ocv_wait_key(10) & 255  # wait for keypress for 10 ms
         if self.pressed == 27:  # exit program on 'esc'
             print("Exiting")
             for cam in self.cameras:
@@ -182,7 +183,7 @@ class getPulseApp(object):
         output_frame = self.processor.frame_out
 
         # show the processed/annotated output frame
-        imshow("Processed", output_frame)
+        ocv_imshow("Processed", output_frame)
 
         # create and/or update the raw data display if needed
         if self.bpm_plot:
@@ -197,6 +198,7 @@ class getPulseApp(object):
         # handle any key presses
         self.key_handler()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Webcam pulse detector.')
     parser.add_argument('--serial', default=None,
@@ -207,6 +209,6 @@ if __name__ == "__main__":
                         help='udp address:port destination for bpm data')
 
     args = parser.parse_args()
-    App = getPulseApp(args)
+    App = WebcamPulseApp(args)
     while True:
         App.main_loop()

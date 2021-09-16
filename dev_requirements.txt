@@ -1,0 +1,7 @@
+pylint
+mypy
+pytest
+pytest-custom-exit-code
+
+# concatenate basic requirements
+-r requirements.txt

@@ -1,12 +1,16 @@
-import numpy as np
-import pandas as pd
-import time
-import cv2
-import pylab
 import os
 import sys
+import time
+
+import cv2
+import numpy as np
+import pandas as pd
 
 from .dl_face_detector import get_face_from_img
+
+# colors specified as BGR
+default_color = (0, 200, 255)
+red_color = (100, 100, 255)
 
 
 def resource_path(relative_path):
@@ -20,12 +24,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-default_color = (100, 255, 100)
-red_color = (100, 100, 255)
-
-
-class findFaceGetPulse(object):
-
+class WebcamFaceTrackingPulseCalculator(object):
     def __init__(self, fps=None, running_on_video=False):
         self.running_on_video = running_on_video
         self.fps = fps
@@ -42,7 +41,7 @@ class findFaceGetPulse(object):
 
         self.last_face_rects = pd.DataFrame(columns=['x', 'y', 'h', 'w'])
         self.fixed_face = None
-        
+
         # restart tracking if face can't be detected for 0.5 seconds
         self.no_face_tolerance = 0.5
         self.no_face_counter = 0
@@ -104,31 +103,6 @@ class findFaceGetPulse(object):
 
         return (v1 + v2 + v3) / 3.
 
-    def plot(self):
-        data = np.array(self.data_buffer).T
-        np.savetxt("data.dat", data)
-        np.savetxt("times.dat", self.times)
-        freqs = 60. * self.freqs
-        idx = np.where((freqs > 50) & (freqs < 180))
-        pylab.figure()
-        n = data.shape[0]
-        for k in xrange(n):
-            pylab.subplot(n, 1, k + 1)
-            pylab.plot(self.times, data[k])
-        pylab.savefig("data.png")
-        pylab.figure()
-        for k in xrange(self.output_dim):
-            pylab.subplot(self.output_dim, 1, k + 1)
-            pylab.plot(self.times, self.pcadata[k])
-        pylab.savefig("data_pca.png")
-
-        pylab.figure()
-        for k in xrange(self.output_dim):
-            pylab.subplot(self.output_dim, 1, k + 1)
-            pylab.plot(freqs[idx], self.fft[k][idx])
-        pylab.savefig("data_fft.png")
-        quit()
-
     def run(self, cam=None):
         if self.t0 is None:
             self.t0 = time.time()
@@ -142,9 +116,7 @@ class findFaceGetPulse(object):
         # first we have to calculate fps
         # if it's not ready - skip everything else
         if not self.calculate_fps():
-            cv2.putText(
-                self.frame_out, "Calculating FPS",
-                (10, 450), cv2.FONT_HERSHEY_PLAIN, 1.5, red_color, 2)
+            cv2.putText(self.frame_out, "Calculating FPS", (10, 450), cv2.FONT_HERSHEY_PLAIN, 1, red_color, 2)
             return
 
         # try to detect face
@@ -155,17 +127,17 @@ class findFaceGetPulse(object):
 
             # too long without a face, restart tracking
             if self.no_face_counter > self.no_face_tolerance * self.fps:
-                print('no face reset')
+                print('Reset: No face found!')
                 self.clear_buffers()
 
-            # otherwise - skip this frame but don't stop reset tracking just yet
+        # otherwise - skip this frame but don't stop reset tracking just yet
         else:
             self.no_face_counter = 0
 
             # if face is out of range - clear buffers and stop tracking
             if self.current_face_out_of_range():
-                #if self.stable_face_counter:
-                print('out of range reset')
+                # if self.stable_face_counter:
+                print('Reset: Face is out of range!')
                 self.clear_buffers()
             else:
                 # we've got a stable face
@@ -175,7 +147,7 @@ class findFaceGetPulse(object):
                     # check if face is stable long enough, start tracking if it's
                     if self.stable_face_counter >= self.stable_face_threshold * self.fps:
                         self.tracking_running = True
-                        print('stabilized')
+                        print('Face found and stabilized!')
 
             # tracking is running
             if self.tracking_running:
@@ -202,28 +174,22 @@ class findFaceGetPulse(object):
 
     def print_start_menu(self, cam):
         if cam is not None:
-            cv2.putText(
-                self.frame_out, "Press 'C' to change camera (current: %s)" % str(
-                    cam),
-                (10, 25), cv2.FONT_HERSHEY_PLAIN, 1.25, default_color)
+            cv2.putText(self.frame_out, "Press 'C' to change camera (current: %s)" % str(cam), (10, 20),
+                        cv2.FONT_HERSHEY_PLAIN, 1, default_color)
 
-        cv2.putText(self.frame_out, "Press 'Esc' to quit",
-                   (10, 75), cv2.FONT_HERSHEY_PLAIN, 1.25, default_color)
+        cv2.putText(self.frame_out, "Press 'Esc' to quit", (10, 40), cv2.FONT_HERSHEY_PLAIN, 1, default_color)
 
     def print_tracking_menu(self, cam):
         if cam is not None:
-            cv2.putText(
-                self.frame_out, "Press 'C' to change camera (current: %s)" % str(
-                    cam),
-                (10, 25), cv2.FONT_HERSHEY_PLAIN, 1.25, default_color)
+            cv2.putText(self.frame_out, "Press 'C' to change camera (current: %s)" % str(cam), (10, 20),
+                        cv2.FONT_HERSHEY_PLAIN, 1, default_color)
 
-        cv2.putText(
-            self.frame_out, "Press 'S' to restart",
-                   (10, 50), cv2.FONT_HERSHEY_PLAIN, 1.5, default_color)
-        cv2.putText(self.frame_out, "Press 'D' to toggle data plot",
-                   (10, 75), cv2.FONT_HERSHEY_PLAIN, 1.5, default_color)
-        cv2.putText(self.frame_out, "Press 'Esc' to quit",
-                   (10, 100), cv2.FONT_HERSHEY_PLAIN, 1.5, default_color)
+        cv2.putText(self.frame_out, "Press 'S' to restart", (10, 40), cv2.FONT_HERSHEY_PLAIN, 1, default_color)
+        cv2.putText(self.frame_out, "Press 'D' to toggle data plot", (10, 60), cv2.FONT_HERSHEY_PLAIN, 1,
+                    default_color)
+        cv2.putText(self.frame_out, "Press 'F' to save data as CSV", (10, 80), cv2.FONT_HERSHEY_PLAIN, 1,
+                    default_color)
+        cv2.putText(self.frame_out, "Press 'ESC' to quit", (10, 100), cv2.FONT_HERSHEY_PLAIN, 1, default_color)
 
     def clear_buffers(self):
         self.data_buffer, self.times = [], []
@@ -232,38 +198,30 @@ class findFaceGetPulse(object):
         self.stable_face_counter = 0
 
     def detect_face(self):
-        self.gray = cv2.equalizeHist(cv2.cvtColor(self.frame_in,
-                                                  cv2.COLOR_BGR2GRAY))
-
+        self.gray = cv2.equalizeHist(cv2.cvtColor(self.frame_in, cv2.COLOR_BGR2GRAY))
         self.face_rect = get_face_from_img(self.frame_in)
 
     def draw_face_rect(self):
         forehead1 = self.get_subface_coord(0.5, 0.18, 0.25, 0.15)
         self.draw_rect(self.face_rect, col=(255, 0, 0))
         x, y, w, h = self.face_rect
-        cv2.putText(self.frame_out, "Face",
-                    (x, y), cv2.FONT_HERSHEY_PLAIN, 1.5, default_color)
+        cv2.putText(self.frame_out, "Face", (x, y), cv2.FONT_HERSHEY_PLAIN, 1, default_color)
         self.draw_rect(forehead1)
 
     def face_dict_to_rect(selfs, face_dict):
-        return (int(face_dict['x']),
-                int(face_dict['y']),
-                int(face_dict['w']),
-                int(face_dict['h']))
+        return (int(face_dict['x']), int(face_dict['y']), int(face_dict['w']), int(face_dict['h']))
 
     def is_face_close(self, face1, face2):
         delta = .07
         d_width = face1['w'] * delta
         d_height = face1['h'] * delta
 
-        return abs(face1['x'] - face2['x']) < d_width and \
-               abs(face1['w'] - face2['w']) < d_width and \
-               abs(face1['y'] - face2['y']) < d_height and \
-               abs(face1['h'] - face2['h']) < d_height
+        return abs(face1['x'] - face2['x']) < d_width and abs(face1['w'] - face2['w']) < d_width and \
+               abs(face1['y'] - face2['y']) < d_height and abs(face1['h'] - face2['h']) < d_height
 
     def current_face_out_of_range(self):
         out_of_range = False
-        
+
         # take current face rectangle
         x, y, w, h = self.face_rect
         face_dict = {'x': x, 'y': y, 'h': h, 'w': w}
@@ -279,9 +237,9 @@ class findFaceGetPulse(object):
         if self.fixed_face is None or not self.is_face_close(face_candidate, self.fixed_face):
             out_of_range = True
             self.fixed_face = face_candidate
-            
+
         self.face_rect = self.face_dict_to_rect(self.fixed_face)
-        
+
         return out_of_range
 
     def track_rate(self):
@@ -358,12 +316,11 @@ class findFaceGetPulse(object):
             if gap:
                 text = "(estimate: %0.1f bpm, wait %0.0f s)" % (bpm_estimate, gap)
             else:
-                text = "(estimate: %0.1f bpm)" % (bpm_estimate)
+                text = "(estimate: %0.1f bpm)" % bpm_estimate
                 self.bpm = bpm_estimate
 
             tsize = 1
-            cv2.putText(self.frame_out, text,
-                       (int(x - w / 2), int(y)), cv2.FONT_HERSHEY_PLAIN, tsize, default_color)
+            cv2.putText(self.frame_out, text, (int(x - w / 2), int(y)), cv2.FONT_HERSHEY_PLAIN, tsize, default_color)
 
     def calculate_fps(self):
         if self.fps:

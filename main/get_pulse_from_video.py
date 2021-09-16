@@ -1,17 +1,18 @@
-from lib.processors_noopenmdao import findFaceGetPulse
-from lib.interface import plotXY, imshow, waitKey, destroyWindow
-import cv2
-from cv2 import moveWindow
 import argparse
-import numpy as np
 import datetime
 import socket
 import sys
-from PIL import Image
+
+import cv2
+import numpy as np
+from cv2 import moveWindow
+from serial import Serial
+
+from lib.interface import plot_x_y, ocv_imshow, ocv_wait_key, ocv_destroy_window
+from lib.processors_noopenmdao import WebcamFaceTrackingPulseCalculator
 
 
-class getPulseApp(object):
-
+class VideoPulseApp(object):
     """
     Python application that finds a face in a video then isolates the
     forehead.
@@ -43,8 +44,8 @@ class getPulseApp(object):
                 ip, port = udp.split(":")
                 port = int(port)
             self.udp = (ip, port)
-            self.sock = socket.socket(socket.AF_INET, # Internet
-                 socket.SOCK_DGRAM) # UDP
+            self.sock = socket.socket(socket.AF_INET,  # Internet
+                                      socket.SOCK_DGRAM)  # UDP
 
         self.w, self.h = 0, 0
         self.pressed = 0
@@ -58,7 +59,7 @@ class getPulseApp(object):
 
         # Basically, everything that isn't communication
         # to the camera device or part of the GUI
-        self.processor = findFaceGetPulse(fps, True)
+        self.processor = WebcamFaceTrackingPulseCalculator(fps, True)
 
         # Init parameters for the cardiac data plot
         self.bpm_plot = False
@@ -87,7 +88,7 @@ class getPulseApp(object):
         Locking the forehead location in place significantly improves
         data quality, once a forehead has been sucessfully isolated.
         """
-        #state = self.processor.find_faces.toggle()
+        # state = self.processor.find_faces.toggle()
         state = self.processor.find_faces_toggle()
         print("face detection lock =", not state)
 
@@ -98,7 +99,7 @@ class getPulseApp(object):
         if self.bpm_plot:
             print("bpm plot disabled")
             self.bpm_plot = False
-            destroyWindow(self.plot_title)
+            ocv_destroy_window(self.plot_title)
         else:
             print("bpm plot enabled")
             if self.processor.find_faces:
@@ -111,17 +112,17 @@ class getPulseApp(object):
         """
         Creates and/or updates the data display
         """
-        plotXY([[self.processor.times,
-                 self.processor.samples],
-                [self.processor.freqs,
+        plot_x_y([[self.processor.times,
+                   self.processor.samples],
+                  [self.processor.freqs,
                  self.processor.fft]],
-               labels=[False, True],
-               showmax=[False, "bpm"],
-               label_ndigits=[0, 0],
-               showmax_digits=[0, 1],
-               skip=[3, 3],
-               name=self.plot_title,
-               bg=self.processor.slices[0])
+                 labels=[False, True],
+                 showmax=[False, "bpm"],
+                 label_ndigits=[0, 0],
+                 showmax_digits=[0, 1],
+                 skip=[3, 3],
+                 name=self.plot_title,
+                 bg=self.processor.slices[0])
 
     def key_handler(self):
         """
@@ -131,7 +132,7 @@ class getPulseApp(object):
         detected.
         """
 
-        self.pressed = waitKey(10) & 255  # wait for keypress for 10 ms
+        self.pressed = ocv_wait_key(10) & 255  # wait for keypress for 10 ms
         if self.pressed == 27:  # exit program on 'esc'
             print("Exiting")
             if self.send_serial:
@@ -160,7 +161,7 @@ class getPulseApp(object):
         output_frame = self.processor.frame_out
 
         # show the processed/annotated output frame
-        imshow("Processed", output_frame)
+        ocv_imshow("Processed", output_frame)
 
         # create and/or update the raw data display if needed
         if self.bpm_plot:
@@ -174,6 +175,7 @@ class getPulseApp(object):
 
         # handle any key presses
         self.key_handler()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Webcam pulse detector.')
@@ -198,7 +200,7 @@ if __name__ == "__main__":
         fps = video_cap.get(cv2.CAP_PROP_FPS)
         print("Frames per second using video.get(cv2.CAP_PROP_FPS) : {0}".format(fps))
 
-    App = getPulseApp(args, fps)
+    App = VideoPulseApp(args, fps)
 
     plot_enabled = False
 

@@ -1,27 +1,25 @@
 # check this amazing tutorial for more details:
 # https://www.pyimagesearch.com/2018/02/26/face-detection-with-opencv-and-deep-learning/
 
-import numpy as np
 import cv2
+import numpy as np
 
 min_confidence = 0.6
 
 # path to Caffe 'deploy' prototxt file
-prototxt_path = './dl_face_detection/deploy.prototxt.txt'
+prototxt_path = "dl_face_detection/deploy.prototxt.txt"
 
 # path to Caffe pre-trained model
-model_path = './dl_face_detection/res10_300x300_ssd_iter_140000.caffemodel'
+model_path = "dl_face_detection/res10_300x300_ssd_iter_140000.caffemodel"
 
 # load our serialized model from disk
 net = cv2.dnn.readNetFromCaffe(prototxt_path, model_path)
 
+
 # using deep learning model to detect the face
-
-
 def get_face_from_img(image):
     # add paddings to make the image square
     (h, w) = image.shape[:2]
-
     pad_right, pad_bottom = (0, 0)
 
     # pad right if image is too tall
@@ -34,8 +32,7 @@ def get_face_from_img(image):
 
     if pad_right or pad_bottom:
         color = [0, 0, 0]
-        image = cv2.copyMakeBorder(image, 0, pad_bottom, 0, pad_right, cv2.BORDER_CONSTANT,
-                                   value=color)
+        image = cv2.copyMakeBorder(image, 0, pad_bottom, 0, pad_right, cv2.BORDER_CONSTANT, value=color)
         w += pad_right
         h += pad_bottom
 
@@ -63,6 +60,6 @@ def get_face_from_img(image):
             box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
             (startX, startY, endX, endY) = box.astype("int")
 
-            return (startX, startY, endX - startX, endY - startY)
+            return startX, startY, endX - startX, endY - startY
 
     return None
