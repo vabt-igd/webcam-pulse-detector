@@ -3,6 +3,10 @@
 *.wpr
 *.wpu
 
+# pycharm idea folder
+#####################
+/.idea/*
+
 # log files #
 #######
 *openmdao_log.txt
